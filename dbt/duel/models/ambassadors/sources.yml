@@ -1,0 +1,11 @@
+version: 1
+
+sources:
+  - name: rawpg
+    database: duel
+    schema: raw
+    tables: 
+      - name: source
+      - name: source__advocacy_programs
+      - name: source__tasks_completed
+
