@@ -1,0 +1,132 @@
+from logging import getLogger
+
+
+from airflow.decorators import dag, task
+
+import datetime
+import pendulum
+import os
+import pandas as pd
+from pathlib import Path
+import json
+from sqlalchemy import create_engine
+import json_repair as jr
+
+logger = getLogger('airflow.task')
+
+@dag(
+    dag_id="ingest_ambassadors",
+    schedule_interval="0 0 * * *",
+    start_date=pendulum.datetime(2025, 5, 1, tz="UTC"),
+    catchup=False,
+    dagrun_timeout=datetime.timedelta(minutes=60),
+    default_args={
+        'retries': 3,
+        'retry_delay': datetime.timedelta(minutes=5)
+    }
+)
+def ingest_ambassadors():
+
+    @task()
+    def read_local_data():
+        
+        logger.info('starting dag')
+        directory = Path('mixed')
+        data = pd.DataFrame
+
+
+        # count how many files, make sure count of json matches too. 
+        count_total_files = len([f for f in directory.iterdir() if f.is_file()])
+        count_json_files = len(list(directory.glob("*.json")))
+
+
+        # a counter for how many files fail to load into the dataframe incase we need to debug.
+        count_correctly_loaded = 0
+        count_cannot_load = 0
+
+
+        # basic data structures for the interim import
+        all_data = []
+        failed_files = [] # list: [filepath, python error]
+
+
+        # to check if all of the files contain the same number of fields (at root level, ignore nested cols)
+        file_shape = {}
+
+
+        def put_to_df(row, all):
+            flat_data = pd.json_normalize(row, sep='_').to_dict('records')
+            all.extend(flat_data)
+            file_shape[str(len(*flat_data))] = file_shape.get(str(len(*flat_data)), 0) + 1
+            return 1 # simply did not fail, so add 1 to a counter
+
+
+        for json_file in directory.glob('*.json'):
+            with open(json_file) as f:
+                try:
+                    data = json.load(f)
+                    count_correctly_loaded += put_to_df(data, all_data)
+
+                # handle non JSON like files into an error list, to process a 2nd time a different way
+                except json.JSONDecodeError as jde:
+                    failed_files.append([json_file, jde])
+                    continue
+
+
+        for f in failed_files: 
+            with open(f[0]) as j:
+                content = j.read().strip()
+                p = jr.repair_json(content) # use the json_repair module to auto fix the json file
+                d = json.loads(p)
+                count_correctly_loaded += put_to_df(d, all_data)
+                # we can write the corrected json out to file too, if we wanted to fix source
+
+
+        # effectively continue debugging potential file errors until an acceptable amount of data is inside the dataframe. display for a human below.
+
+        print(f'There are {count_total_files}, of which {count_json_files} are json. {count_correctly_loaded} ingested to dataframe succesfully, {count_cannot_load} could not load.')
+        print(f'The column shape of the json files: {file_shape}')
+
+
+        # convert all the json dict objects to a pandas dataframe for easier processing.
+        df = pd.DataFrame(all_data)
+
+        print(f'Double check DF length: {len(df)}')
+
+        return df
+    
+    @task
+    def unpack_nested_json(df):
+        # lets unpack advocacy program into the parent.
+        unpacked = pd.json_normalize(df['advocacy_programs'].explode('advocacy_programs'))
+        newdf = pd.concat([df, unpacked], axis=1)
+        
+        tasks = pd.json_normalize(newdf['tasks_completed'].explode('tasks_completed'))
+
+        return [newdf, tasks]
+
+    @task
+    def upload_to_postgres(data):
+
+        
+
+        newdf = data[0]
+        tasks = data[1]
+
+        # connect and use the local postgres instance we have running in docker.
+        engine = create_engine('postgresql://postgres:pass@127.0.0.1:5432/duel')
+
+        # this is safe to do in this instance, because advocacy_programs always has only 1 item in it.
+        newdf[['user_id', 'name', 'email', 'instagram_handle', 'tiktok_handle', 'joined_at']].astype(str).to_sql('source', engine, if_exists='replace', index=True, method='multi', schema='raw')
+        newdf[['program_id', 'brand', 'total_sales_attributed']].astype(str).to_sql('source__advocacy_programs', engine, if_exists='replace', index=True, method='multi', schema='raw')
+        tasks.astype(str).to_sql('source__tasks_completed', engine, if_exists='replace', index=True, method='multi', schema='raw')
+
+
+
+    (upload_to_postgres(
+        unpack_nested_json(
+            read_local_data()
+        )
+    ))
+
+ingest_ambassadors()
