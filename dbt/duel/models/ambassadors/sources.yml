@@ -8,4 +8,9 @@ sources:
       - name: source
       - name: source__advocacy_programs
       - name: source__tasks_completed
+  - name: lookup
+    database: duel
+    schema: dbt_lookup
+    tables: 
+      - name: brand
 
