@@ -21,6 +21,22 @@ activate a python3.12.2 venv like so:
 
 The requirements.txt can be applied to your venv for everything you need to run.
 
+Create a file with this content at /Users/{profile}/.dbt/profiles.yml:
+```duel:
+  outputs:
+    dev:
+      dbname: duel
+      host: 127.0.0.1
+      pass: pass
+      port: 5432
+      schema: dbt
+      threads: 1
+      type: postgres
+      user: postgres
+  target: dev
+  ```
+
+
 run docker compose for the postgres backend for dbt:
 
 `docker compose up -d`
