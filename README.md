@@ -5,11 +5,30 @@
 - python 3.12.2
 - Docker desktop 
 
+In a terminal, navigate to the root directory:
+
+extract the data to local ./mixed/:
+
+`tar xvf data.tar.gz`
+
+activate a python3.12.2 venv like so:
+
+`python3 -m venv env`
+
+`source env/bin/activate`
+
+`pip install -r requirements.txt`
+
 The requirements.txt can be applied to your venv for everything you need to run.
+
+run docker compose for the postgres backend for dbt:
+
+`docker compose up -d`
 
 # 1) Basic data exploration:
 TLDR;
 - data_debugging.ipynb is a sandbox to explore and fix data then upload to postgres
+- Execute through data_debugging.ipynb to the end; this places raw data into pgdb on localhost.
 
 The initial data exploration has been done and documented in the data_debugging.ipynb notebook. 
 This is a sandbox for debugging the data, finding issues and exploring the basic structure. Between python pandas and a data viewer like datawrangler, you can get a good feel for the state of the data. 
@@ -61,5 +80,16 @@ dbt/duel/models/analysis can contain metrics as built in tandem with data scient
 
 I have included a basic model here that references the prerequisite tables as proof of concept of analysis in dbt. The data is neatly unpacked now so any metric can easily be aggregated.
 
+- navigate terminal to ./dbt/duel
+- `dbt debug` to test connection
+- `dbt run` to complete models (fast!)
+
+Notice that the data is split in the duel database; between the initial raw schema from pandas, then categorised into their correct schemas; dbt, dbt_analysis and dbt_lookup.
+
 # 3) data output
-The data created so far can now be viewed at localhost:5432 in a postgres explorer like pgAdmin. At this stage the data should be delivered automatically for consideration, via visualisation or shared data dumps with a notification to interested parties. This would be again an Airflow task, to either deliver the file / notification of completion of new datasets, or upon failure to notify by email that the pipeline has failed.
+The data created so far can now be viewed at 127.0.0.1:5432 in a postgres explorer like pgAdmin. (user: postgres pass: pass). For ease of use / proof of concept, data can be viewed inside the data_output.ipynb. 
+
+At this stage, Airflow would be on the final task of the DAG the data should be delivered automatically for consideration, via visualisation or shared data dumps with a notification to interested parties. This would be again an Airflow task, to either deliver the file / notification of completion of new datasets, or upon failure to notify by email that the pipeline has failed.
+
+# 4) AWS considerations
+AWS has managed services for Airflow, dbt and other database engines, so everything implemented here pythonically could be automated in Airflow and served via AWS. 
