@@ -3,3 +3,4 @@ mixed/
 env/
 duel.ipynb
 .DS_Store
+logs/
