@@ -58,7 +58,7 @@ Because of the decision to use postgres (for the first time!) it's a rather stru
 
 This design would be no good for production in that if this was to process more data files, the index_id from the dataframe would conflict every run. This could be solved easily by again using incremental tables, snapshots for SCD2, or by hashmaps on composite keys across the data such that subsequent runs would not conflict with previously ingested data.
 
-The JSON structures are fully unpacked into their own tables and some assumptions were made on the value of the data, with an approach taken to throw away data we are sure is not useful. Below is a map of the full unpacked dataset. The nested JSON objects in the dataset were always of length 1 and thus easy to map to the base data, but the logic that it could be implemented here as a one to many map works fine.
+The JSON structures are fully unpacked into their own tables and some assumptions were made on the value of the data, with an approach taken to throw away data we are sure is not useful. Below is a map of the full unpacked dataset. The nested JSON objects in the dataset were always of length 1 and thus easy to map to the base data, but the logic that it could be implemented here as a one to many map works fine. Some fields are still a little dirty, but easily fixed - the main issues are fixed.
 
 
 ```sql
